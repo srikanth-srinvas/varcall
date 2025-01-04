@@ -15,10 +15,14 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { VARCALL  } from './workflows/varcall'
+include { FASTQC } from './modules/nf-core/fastqc/main'
+include { CUTADAPT } from './modules/nf-core/cutadapt/main'
+include { BWA } from './modules/nf-core/bwa/main'
+include { SAMTOOLS } from './modules/nf-core/samtools/main'
+include { FREEBAYES } from './modules/nf-core/freebayes/main'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_varcall_pipeline'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_varcall_pipeline'
-include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_varcall_pipeline'
+include { PIPELINE_COMPLETION } from './subworkflows/local/utils_nfcore_varcall_pipeline'
+include { getGenomeAttribute } from './subworkflows/local/utils_nfcore_varcall_pipeline'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -26,9 +30,6 @@ include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_varc
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// TODO nf-core: Remove this line if you don't need a FASTA file
-//   This is an example of how to use getGenomeAttribute() to fetch parameters
-//   from igenomes.config using `--genome`
 params.fasta = getGenomeAttribute('fasta')
 
 /*
@@ -37,25 +38,32 @@ params.fasta = getGenomeAttribute('fasta')
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-//
-// WORKFLOW: Run main analysis pipeline depending on type of input
-//
-workflow NFCORE_VARCALL {
+workflow VARCALL {
 
     take:
-    samplesheet // channel: samplesheet read in from --input
+    reads
 
     main:
 
-    //
-    // WORKFLOW: Run pipeline
-    //
-    VARCALL (
-        samplesheet
-    )
+    // Run FastQC
+    FASTQC (reads)
+
+    // Run Cutadapt
+    CUTADAPT (FASTQC.out)
+
+    // Run BWA
+    BWA (CUTADAPT.out)
+
+    // Run SAMtools
+    SAMTOOLS (BWA.out)
+
+    // Run FreeBayes
+    FREEBAYES (SAMTOOLS.out)
+
     emit:
-    multiqc_report = VARCALL.out.multiqc_report // channel: /path/to/multiqc_report.html
+    vcf = FREEBAYES.out.vcf
 }
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -65,9 +73,7 @@ workflow NFCORE_VARCALL {
 workflow {
 
     main:
-    //
     // SUBWORKFLOW: Run initialisation tasks
-    //
     PIPELINE_INITIALISATION (
         params.version,
         params.validate_params,
@@ -77,15 +83,12 @@ workflow {
         params.input
     )
 
-    //
     // WORKFLOW: Run main workflow
-    //
-    NFCORE_VARCALL (
+    VARCALL (
         PIPELINE_INITIALISATION.out.samplesheet
     )
-    //
+
     // SUBWORKFLOW: Run completion tasks
-    //
     PIPELINE_COMPLETION (
         params.email,
         params.email_on_fail,
@@ -93,7 +96,7 @@ workflow {
         params.outdir,
         params.monochrome_logs,
         params.hook_url,
-        NFCORE_VARCALL.out.multiqc_report
+        VARCALL.out.vcf
     )
 }
 
