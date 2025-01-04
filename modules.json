@@ -15,6 +15,16 @@
                         "git_sha": "f85dbddd7a335fc0f5ac331e8d22ca94123b654b",
                         "installed_by": ["modules"]
                     },
+                    "bcftools/index": {
+                        "branch": "master",
+                        "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",
+                        "installed_by": ["modules"]
+                    },
+                    "bcftools/norm": {
+                        "branch": "master",
+                        "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",
+                        "installed_by": ["modules"]
+                    },
                     "bcftools/stats": {
                         "branch": "master",
                         "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",
