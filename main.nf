@@ -18,8 +18,11 @@
 include { FASTQC } from './modules/nf-core/fastqc/main'
 include { CUTADAPT } from './modules/nf-core/cutadapt/main'
 include { BWA_MEM } from './modules/nf-core/bwa/mem'
-include { SAMTOOLS } from './modules/nf-core/samtools/main'
+include { SAMTOOLS_SORT } from './modules/nf-core/samtools/sort'
+include { SAMTOOLS_INDEX } from './modules/nf-core/samtools/index'
 include { FREEBAYES } from './modules/nf-core/freebayes/main'
+include { MULTIQC } from './modules/nf-core/multiqc/main'
+include { SNPEFF } from './modules/nf-core/snpeff/main'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_varcall_pipeline'
 include { PIPELINE_COMPLETION } from './subworkflows/local/utils_nfcore_varcall_pipeline'
 include { getGenomeAttribute } from './subworkflows/local/utils_nfcore_varcall_pipeline'
@@ -52,14 +55,25 @@ workflow VARCALL {
     // Run BWA
     BWA_MEM (CUTADAPT.out)
 
-    // Run SAMtools
-    SAMTOOLS (BWA_MEM.out)
+    // Run SAMtools Sort
+    SAMTOOLS_SORT (BWA_MEM.out)
+
+    // Run SAMtools Index
+    SAMTOOLS_INDEX (SAMTOOLS_SORT.out)
 
     // Run FreeBayes
-    FREEBAYES (SAMTOOLS.out)
+    FREEBAYES (SAMTOOLS_INDEX.out)
+
+    // Run SnpEff
+    SNPEFF (FREEBAYES.out)
+
+    // Run MultiQC
+    MULTIQC (FASTQC.out, CUTADAPT.out, BWA_MEM.out, SAMTOOLS_SORT.out, SAMTOOLS_INDEX.out, FREEBAYES.out, SNPEFF.out)
 
     emit:
     vcf = FREEBAYES.out.vcf
+    annotated_vcf = SNPEFF.out.annotated_vcf
+    multiqc_report = MULTIQC.out.report
 }
 
 /*
@@ -93,6 +107,8 @@ workflow {
         params.outdir,
         params.monochrome_logs,
         params.hook_url,
-        VARCALL.out.vcf
+        VARCALL.out.vcf,
+        VARCALL.out.annotated_vcf,
+        VARCALL.out.multiqc_report
     )
 }
