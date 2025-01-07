@@ -17,9 +17,9 @@
 
 include { FASTQC } from './modules/nf-core/fastqc/main'
 include { CUTADAPT } from './modules/nf-core/cutadapt/main'
-include { BWA_MEM } from './modules/nf-core/bwa/mem'
-include { SAMTOOLS_SORT } from './modules/nf-core/samtools/sort'
-include { SAMTOOLS_INDEX } from './modules/nf-core/samtools/index'
+include { BWA_MEM } from './modules/nf-core/bwa/mem/main'
+include { SAMTOOLS_SORT } from './modules/nf-core/samtools/sort/main'
+include { SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
 include { FREEBAYES } from './modules/nf-core/freebayes/main'
 include { MULTIQC } from './modules/nf-core/multiqc/main'
 include { SNPEFF_SNPEFF } from './modules/nf-core/snpeff/snpeff/main'
@@ -34,6 +34,8 @@ include { getGenomeAttribute } from './subworkflows/local/utils_nfcore_varcall_p
 */
 
 params.fasta = getGenomeAttribute('fasta')
+params.bwa_index = getGenomeAttribute('bwa_index')
+params.sort_bam = true // Added parameter for BAM sorting
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,10 +55,15 @@ workflow VARCALL {
     CUTADAPT(reads)
 
     // Run BWA for alignment
-    BWA_MEM(CUTADAPT.out)
+    BWA_MEM(
+        CUTADAPT.out,
+        params.bwa_index,
+        params.fasta,
+        params.sort_bam
+    )
 
-    // Run SAMtools Sort
-    SAMTOOLS_SORT(BWA_MEM.out)
+    // Run SAMtools Sort (if not already sorted by BWA_MEM)
+    SAMTOOLS_SORT(BWA_MEM.out.bam)
 
     // Run SAMtools Index
     SAMTOOLS_INDEX(SAMTOOLS_SORT.out)
@@ -68,7 +75,15 @@ workflow VARCALL {
     SNPEFF_SNPEFF(FREEBAYES.out)
 
     // Run MultiQC (Summary Reports)
-    MULTIQC(FASTQC.out, CUTADAPT.out, BWA_MEM.out, SAMTOOLS_SORT.out, SAMTOOLS_INDEX.out, FREEBAYES.out, SNPEFF_SNPEFF.out)
+    MULTIQC(
+        FASTQC.out,
+        CUTADAPT.out,
+        BWA_MEM.out,
+        SAMTOOLS_SORT.out,
+        SAMTOOLS_INDEX.out,
+        FREEBAYES.out,
+        SNPEFF_SNPEFF.out
+    )
 
     emit:
     vcf = FREEBAYES.out.vcf
