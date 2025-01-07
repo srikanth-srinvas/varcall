@@ -46,29 +46,29 @@ workflow VARCALL {
     reads
 
     main:
-    // Run FastQC
-    FASTQC (reads)
+    // Run FastQC (Quality Control)
+    FASTQC(reads)
 
-    // Run Cutadapt
-    CUTADAPT (FASTQC.out)
+    // Run Cutadapt (Trimming)
+    CUTADAPT(reads)
 
-    // Run BWA
-    BWA_MEM (CUTADAPT.out)
+    // Run BWA for alignment
+    BWA_MEM(CUTADAPT.out)
 
     // Run SAMtools Sort
-    SAMTOOLS_SORT (BWA_MEM.out)
+    SAMTOOLS_SORT(BWA_MEM.out)
 
     // Run SAMtools Index
-    SAMTOOLS_INDEX (SAMTOOLS_SORT.out)
+    SAMTOOLS_INDEX(SAMTOOLS_SORT.out)
 
-    // Run FreeBayes
-    FREEBAYES (SAMTOOLS_INDEX.out)
+    // Run FreeBayes (Variant Calling)
+    FREEBAYES(SAMTOOLS_INDEX.out)
 
-    // Run SnpEff
-    SNPEFF_SNPEFF (FREEBAYES.out)
+    // Run SnpEff (Annotation)
+    SNPEFF_SNPEFF(FREEBAYES.out)
 
-    // Run MultiQC
-    MULTIQC (FASTQC.out, CUTADAPT.out, BWA_MEM.out, SAMTOOLS_SORT.out, SAMTOOLS_INDEX.out, FREEBAYES.out, SNPEFF_SNPEFF.out)
+    // Run MultiQC (Summary Reports)
+    MULTIQC(FASTQC.out, CUTADAPT.out, BWA_MEM.out, SAMTOOLS_SORT.out, SAMTOOLS_INDEX.out, FREEBAYES.out, SNPEFF_SNPEFF.out)
 
     emit:
     vcf = FREEBAYES.out.vcf
