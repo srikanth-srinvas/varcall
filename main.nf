@@ -48,33 +48,25 @@ workflow VARCALL {
     reads
 
     main:
-    // Run FastQC (Quality Control)
+    // Quality Control
     FASTQC(reads)
 
-    // Run Cutadapt (Trimming)
+    // Adapter Trimming
     CUTADAPT(reads)
 
-    // Run BWA for alignment
+    // Alignment
     BWA_MEM(
-        reads: CUTADAPT.out, // Pass the reads (output from CUTADAPT)
-        index: params.bwa_index, // Path to the BWA index
-        fasta: params.fasta, // Reference genome fasta file
-        sort_bam: params.sort_bam // Whether to sort the BAM output
+        reads: CUTADAPT.out,
+        index: params.bwa_index,
+        fasta: params.fasta,
+        sort_bam: params.sort_bam
     )
 
-    // Run SAMtools Sort (if not already sorted by BWA_MEM)
+    // Continue the rest of the workflow
     SAMTOOLS_SORT(BWA_MEM.out.bam)
-
-    // Run SAMtools Index
     SAMTOOLS_INDEX(SAMTOOLS_SORT.out)
-
-    // Run FreeBayes (Variant Calling)
     FREEBAYES(SAMTOOLS_INDEX.out)
-
-    // Run SnpEff (Annotation)
     SNPEFF_SNPEFF(FREEBAYES.out)
-
-    // Run MultiQC (Summary Reports)
     MULTIQC(
         FASTQC.out,
         CUTADAPT.out,
