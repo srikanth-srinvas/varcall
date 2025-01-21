@@ -56,10 +56,10 @@ workflow VARCALL {
 
     // Run BWA for alignment
     BWA_MEM(
-        CUTADAPT.out,
-        params.bwa_index,
-        params.fasta,
-        params.sort_bam
+        reads: CUTADAPT.out, // Pass the reads (output from CUTADAPT)
+        index: params.bwa_index, // Path to the BWA index
+        fasta: params.fasta, // Reference genome fasta file
+        sort_bam: params.sort_bam // Whether to sort the BAM output
     )
 
     // Run SAMtools Sort (if not already sorted by BWA_MEM)
