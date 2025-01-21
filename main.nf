@@ -15,10 +15,17 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { VARCALL  } from './workflows/varcall'
+include { FASTQC } from './modules/nf-core/fastqc/main'
+include { CUTADAPT } from './modules/nf-core/cutadapt/main'
+include { BWA_MEM } from './modules/nf-core/bwa/mem/main'
+include { SAMTOOLS_SORT } from './modules/nf-core/samtools/sort/main'
+include { SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
+include { FREEBAYES } from './modules/nf-core/freebayes/main'
+include { MULTIQC } from './modules/nf-core/multiqc/main'
+include { SNPEFF_SNPEFF } from './modules/nf-core/snpeff/snpeff/main'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_varcall_pipeline'
-include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_varcall_pipeline'
-include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_varcall_pipeline'
+include { PIPELINE_COMPLETION } from './subworkflows/local/utils_nfcore_varcall_pipeline'
+include { getGenomeAttribute } from './subworkflows/local/utils_nfcore_varcall_pipeline'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -26,10 +33,9 @@ include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_varc
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// TODO nf-core: Remove this line if you don't need a FASTA file
-//   This is an example of how to use getGenomeAttribute() to fetch parameters
-//   from igenomes.config using `--genome`
 params.fasta = getGenomeAttribute('fasta')
+params.bwa_index = getGenomeAttribute('bwa_index')
+params.sort_bam = true // Added parameter for BAM sorting
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -37,25 +43,46 @@ params.fasta = getGenomeAttribute('fasta')
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-//
-// WORKFLOW: Run main analysis pipeline depending on type of input
-//
-workflow NFCORE_VARCALL {
-
+workflow VARCALL {
     take:
-    samplesheet // channel: samplesheet read in from --input
+    reads
 
     main:
+    // Quality Control
+    FASTQC(reads)
 
-    //
-    // WORKFLOW: Run pipeline
-    //
-    VARCALL (
-        samplesheet
+    // Adapter Trimming
+    CUTADAPT(reads)
+
+    // Alignment
+    BWA_MEM(
+        reads: CUTADAPT.out,
+        index: params.bwa_index,
+        fasta: params.fasta,
+        sort_bam: params.sort_bam
     )
+
+    // Continue the rest of the workflow
+    SAMTOOLS_SORT(BWA_MEM.out.bam)
+    SAMTOOLS_INDEX(SAMTOOLS_SORT.out)
+    FREEBAYES(SAMTOOLS_INDEX.out)
+    SNPEFF_SNPEFF(FREEBAYES.out)
+    MULTIQC(
+        FASTQC.out,
+        CUTADAPT.out,
+        BWA_MEM.out,
+        SAMTOOLS_SORT.out,
+        SAMTOOLS_INDEX.out,
+        FREEBAYES.out,
+        SNPEFF_SNPEFF.out
+    )
+
     emit:
-    multiqc_report = VARCALL.out.multiqc_report // channel: /path/to/multiqc_report.html
+    vcf = FREEBAYES.out.vcf
+    annotated_vcf = SNPEFF_SNPEFF.out.annotated_vcf
+    multiqc_report = MULTIQC.out.report
 }
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -63,11 +90,8 @@ workflow NFCORE_VARCALL {
 */
 
 workflow {
-
     main:
-    //
     // SUBWORKFLOW: Run initialisation tasks
-    //
     PIPELINE_INITIALISATION (
         params.version,
         params.validate_params,
@@ -77,15 +101,12 @@ workflow {
         params.input
     )
 
-    //
     // WORKFLOW: Run main workflow
-    //
-    NFCORE_VARCALL (
+    VARCALL (
         PIPELINE_INITIALISATION.out.samplesheet
     )
-    //
+
     // SUBWORKFLOW: Run completion tasks
-    //
     PIPELINE_COMPLETION (
         params.email,
         params.email_on_fail,
@@ -93,12 +114,8 @@ workflow {
         params.outdir,
         params.monochrome_logs,
         params.hook_url,
-        NFCORE_VARCALL.out.multiqc_report
+        VARCALL.out.vcf,
+        VARCALL.out.annotated_vcf,
+        VARCALL.out.multiqc_report
     )
 }
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    THE END
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
